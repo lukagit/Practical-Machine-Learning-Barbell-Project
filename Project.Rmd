@@ -1,0 +1,99 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "L. Brdar"
+output: html_document
+---
+
+## Overview
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Data
+
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+### The submission
+
+The goal of this project is to build prediction model for the manner in which they did the exercise. This is the "classe" variable in the training set. The output of the project is going to be a report describing how the model has been built, how was the cross validation used, the expected out of sample error, and to explain the choices. Finally, the prediction model will be used to predict 20 different test cases (provided).
+
+## Getting and Cleaning Data
+
+Loading of necessary packages for the analysis and obtaining of data. Data will be stored under 'train' and 'test', and missing values are labeled as 'NA'. 
+```{r message=FALSE, cashe=TRUE}
+library(caret)
+library(randomForest)
+library(rpart)
+set.seed(123)
+train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA", "", "#DIV/0!"), stringsAsFactors = TRUE)
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings=c("NA", "", "#DIV/0!"), stringsAsFactors = TRUE)
+```
+
+We can get an overview of the data:
+```{r}
+dim(train)
+dim(test)
+```
+
+The first, index column, and the timestamp columns are not relevant, so we can exclude them.
+Furthermore, since the exploratory data showed that many of the columns are almost entirely filled with NAs (sometimes almost 100%), we can list those columns and exclude them also from further analysis.
+```{r}
+
+colMeans((is.na(train)))[colMeans((is.na(train)))>0.8]
+
+train <- train[, colMeans(is.na(train))<0.8]
+train <- train[, -(3:7)]
+train <- train[, -1]
+train <- train[, colMeans(is.na(train))<0.8]
+```
+
+In order to be in line, the test set also undertakes the same filters.
+```{r}
+test <- test[,intersect(colnames(train), colnames(test))]
+```
+
+### Partitioning
+After obtaining tidy data, train data is split into train data (trainSet) with 80% of data, and the rest 20% to the test data (testSet).
+
+```{r}
+partit <- createDataPartition(train$classe, p=0.8, list=FALSE)
+trainSet <- train[partit, ]
+testSet <- train[-partit, ]
+```
+
+## Decision Tree
+
+The first testing model is the Decision tree from rpart package:
+```{r cashe=TRUE}
+fit1 <- rpart(classe ~ ., data=trainSet, method="class")
+predictionsDT <- predict(fit1, testSet, type = "class")
+confm1 <- confusionMatrix(predictionsDT, testSet$classe)
+confm1
+```
+From the output it is possible to see that the accuracy of the model is 0.72, so there is room for improvement.
+
+
+## Random Forest
+
+The second model is Random Forest from randomForest package:
+```{r cashe=TRUE}
+fit2 <- randomForest(classe ~ ., data=trainSet)
+predictionRF <- predict(fit2, testSet, type = "class")
+confm2 <- confusionMatrix(predictionRF, testSet$classe)
+confm2
+```
+The accuracy is now 0.9951, which is a significant improvement. 
+The out of sample error would then be 0.0049 (1-accuracy).
+
+## Prediction of test data
+
+Finally, the predicted values are:
+```{r}
+predict <- predict(fit2, test, type = "class")
+predict
+```
